@@ -193,100 +193,177 @@ button{font:inherit}
   const state = {
     level:'foundation',
     current:null,
-    answered:false
+    answered:false,
+    pools:{foundation:[],core:[],challenge:[]},
+    indexes:{foundation:0,core:0,challenge:0},
+    lastKey:{foundation:'',core:'',challenge:''}
   };
 
   const minus = n => n < 0 ? '−' + Math.abs(n) : String(n);
-  const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
-  const choice = arr => arr[rand(0,arr.length-1)];
 
-  function foundationQuestion(){
-    for(let tries=0; tries<200; tries++){
-      const start = rand(-8,8);
-      if(start===0) continue;
-      const op = choice(['+','−']);
-      const amount = rand(2,7);
-      const answer = op==='+' ? start+amount : start-amount;
-      if(answer>=-10 && answer<=10){
-        return {start,steps:[{op,amount}],positions:[start,answer],answer};
-      }
+  function shuffle(arr){
+    for(let i=arr.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [arr[i],arr[j]]=[arr[j],arr[i]];
     }
-    return {start:-6,steps:[{op:'+',amount:4}],positions:[-6,-2],answer:-2};
+    return arr;
   }
 
-  function coreQuestion(){
-    const type = choice(['negCross','posCross','negativeSide','positiveSide']);
-
-    if(type==='negCross'){
-      const start=-rand(3,9);
-      const amount=rand(Math.abs(start)+2,Math.abs(start)+7);
-      const answer=start+amount;
-      return {start,steps:[{op:'+',amount}],positions:[start,answer],answer};
-    }
-
-    if(type==='posCross'){
-      const start=rand(3,9);
-      const amount=rand(start+2,start+7);
-      const answer=start-amount;
-      return {start,steps:[{op:'−',amount}],positions:[start,answer],answer};
-    }
-
-    if(type==='negativeSide'){
-      const start=-rand(4,10);
-      const op=choice(['+','−']);
-      let amount, answer;
-      if(op==='+'){
-        amount=rand(2,Math.max(2,Math.abs(start)-1));
-        answer=start+amount;
-      } else {
-        amount=rand(3,7);
-        answer=start-amount;
-      }
-      return {start,steps:[{op,amount}],positions:[start,answer],answer};
-    }
-
-    const start=rand(4,10);
-    const op=choice(['+','−']);
-    let amount, answer;
-    if(op==='−'){
-      amount=rand(2,Math.max(2,start-1));
-      answer=start-amount;
-    } else {
-      amount=rand(3,7);
-      answer=start+amount;
-    }
-    return {start,steps:[{op,amount}],positions:[start,answer],answer};
+  function makeQuestionData(start,steps){
+    const positions=[start];
+    let value=start;
+    steps.forEach(step=>{
+      value=step.op==='+' ? value+step.amount : value-step.amount;
+      positions.push(value);
+    });
+    return {start,steps,positions,answer:value};
   }
 
-  function challengeQuestion(){
-    for(let tries=0; tries<300; tries++){
-      const start=rand(-10,10);
-      if(start===0) continue;
+  function questionKey(q){
+    let key=String(q.start);
+    q.steps.forEach(step=>key+=`|${step.op}${step.amount}`);
+    return key;
+  }
 
-      const op1=choice(['+','−']);
-      const op2=choice(['+','−']);
-      const a=rand(3,10);
-      const b=rand(3,10);
-
-      const p1=op1==='+' ? start+a : start-a;
-      const p2=op2==='+' ? p1+b : p1-b;
-
-      if(Math.abs(p1)<=15 && Math.abs(p2)<=15){
-        return {
-          start,
-          steps:[{op:op1,amount:a},{op:op2,amount:b}],
-          positions:[start,p1,p2],
-          answer:p2
-        };
+  function uniquePool(builder){
+    const seen=new Set();
+    const list=[];
+    const add=q=>{
+      const key=questionKey(q);
+      if(!seen.has(key)){
+        seen.add(key);
+        list.push(q);
       }
-    }
-
-    return {
-      start:-6,
-      steps:[{op:'+',amount:10},{op:'−',amount:7}],
-      positions:[-6,4,-3],
-      answer:-3
     };
+    builder(add);
+    return shuffle(list);
+  }
+
+  function buildFoundationPool(){
+    return uniquePool(add=>{
+      // Negative + positive
+      for(let start=-9;start<=-1;start++){
+        for(let amount=2;amount<=9;amount++){
+          const q=makeQuestionData(start,[{op:'+',amount}]);
+          if(q.answer>=-10 && q.answer<=10) add(q);
+        }
+      }
+
+      // Negative - positive
+      for(let start=-8;start<=-1;start++){
+        for(let amount=2;amount<=7;amount++){
+          const q=makeQuestionData(start,[{op:'−',amount}]);
+          if(q.answer>=-12) add(q);
+        }
+      }
+
+      // Positive - larger positive, producing a negative result
+      for(let start=1;start<=9;start++){
+        for(let amount=start+2;amount<=Math.min(start+9,15);amount++){
+          const q=makeQuestionData(start,[{op:'−',amount}]);
+          if(q.answer>=-10) add(q);
+        }
+      }
+    });
+  }
+
+  function buildCorePool(){
+    return uniquePool(add=>{
+      // Negative + positive, crossing zero
+      for(let start=-12;start<=-4;start++){
+        for(let amount=Math.abs(start)+2;amount<=Math.abs(start)+10;amount++){
+          const q=makeQuestionData(start,[{op:'+',amount}]);
+          if(q.answer<=10) add(q);
+        }
+      }
+
+      // Positive - larger positive, crossing zero
+      for(let start=4;start<=12;start++){
+        for(let amount=start+2;amount<=start+10;amount++){
+          const q=makeQuestionData(start,[{op:'−',amount}]);
+          if(q.answer>=-10) add(q);
+        }
+      }
+
+      // Negative - positive
+      for(let start=-12;start<=-5;start++){
+        for(let amount=4;amount<=9;amount++){
+          const q=makeQuestionData(start,[{op:'−',amount}]);
+          if(q.answer>=-20) add(q);
+        }
+      }
+
+      // Negative + positive while staying negative
+      for(let start=-14;start<=-6;start++){
+        for(let amount=3;amount<=Math.abs(start)-2;amount++){
+          add(makeQuestionData(start,[{op:'+',amount}]));
+        }
+      }
+    });
+  }
+
+  function buildChallengePool(){
+    return uniquePool(add=>{
+      for(let start=-10;start<=10;start++){
+        if(start===0) continue;
+
+        for(const op1 of ['+','−']){
+          for(const op2 of ['+','−']){
+            for(let a=3;a<=10;a++){
+              for(let b=3;b<=10;b++){
+                const q=makeQuestionData(
+                  start,
+                  [{op:op1,amount:a},{op:op2,amount:b}]
+                );
+
+                const p1=q.positions[1];
+                const p2=q.positions[2];
+
+                if(Math.abs(p1)>15 || Math.abs(p2)>15) continue;
+
+                // Every challenge question must actually involve negative-number thinking.
+                const startsNegative=start<0;
+                const crossesNegative=(start>0 && p1<0) || (p1>0 && p2<0);
+                const remainsOrReturnsFromNegative=p1<0 || p2<0;
+
+                if(startsNegative || crossesNegative || remainsOrReturnsFromNegative){
+                  add(q);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function resetPools(){
+    state.pools.foundation=buildFoundationPool();
+    state.pools.core=buildCorePool();
+    state.pools.challenge=buildChallengePool();
+    state.indexes.foundation=0;
+    state.indexes.core=0;
+    state.indexes.challenge=0;
+  }
+
+  function nextUniqueQuestion(level){
+    let pool=state.pools[level];
+
+    if(state.indexes[level]>=pool.length){
+      const previous=state.lastKey[level];
+      pool=shuffle([...pool]);
+
+      if(pool.length>1 && questionKey(pool[0])===previous){
+        [pool[0],pool[1]]=[pool[1],pool[0]];
+      }
+
+      state.pools[level]=pool;
+      state.indexes[level]=0;
+    }
+
+    const q=state.pools[level][state.indexes[level]++];
+    state.lastKey[level]=questionKey(q);
+    return q;
   }
 
   function expressionText(q){
@@ -298,10 +375,7 @@ button{font:inherit}
   }
 
   function makeQuestion(){
-    state.current =
-      state.level==='foundation' ? foundationQuestion() :
-      state.level==='core' ? coreQuestion() :
-      challengeQuestion();
+    state.current=nextUniqueQuestion(state.level);
 
     state.answered=false;
     input.value='';
@@ -396,6 +470,7 @@ button{font:inherit}
     });
   });
 
+  resetPools();
   makeQuestion();
 })();
 </script>
