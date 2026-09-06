@@ -1,0 +1,403 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Negative Numbers Practice</title>
+<style>
+:root{
+  --bg:#f6f7fb;
+  --card:#ffffff;
+  --text:#172033;
+  --muted:#667085;
+  --border:#d9dee8;
+  --accent:#3156d3;
+  --accent-soft:#eef2ff;
+  --good:#137333;
+  --good-soft:#e9f7ee;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+.wrap{max-width:980px;margin:0 auto;padding:24px}
+h1{margin:0 0 20px;font-size:clamp(28px,5vw,44px)}
+.levels{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  margin-bottom:18px
+}
+.level-btn{
+  min-height:64px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:var(--card);
+  padding:14px;
+  text-align:center;
+  font-size:18px;
+  font-weight:700;
+  cursor:pointer
+}
+.level-btn.active{
+  border:2px solid var(--accent);
+  background:var(--accent-soft)
+}
+.panel{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:22px
+}
+.problem{text-align:center;margin:16px 0 28px}
+.problem-label{color:var(--muted);font-size:15px;margin-bottom:7px}
+.expression{
+  font-size:clamp(40px,8vw,66px);
+  font-weight:700;
+  letter-spacing:.03em
+}
+.line-wrap{
+  overflow-x:auto;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:#fff;
+  padding:10px
+}
+svg{
+  display:block;
+  width:100%;
+  min-width:620px;
+  height:auto
+}
+form{max-width:460px;margin:24px auto 0}
+.answer-label{
+  display:block;
+  text-align:center;
+  font-weight:700;
+  margin-bottom:8px
+}
+.answer-row{display:flex;gap:10px}
+input{
+  min-width:0;
+  flex:1;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:13px 14px;
+  font-size:22px;
+  text-align:center;
+  background:#fff
+}
+button{font:inherit}
+.check{
+  min-height:50px;
+  border:0;
+  border-radius:14px;
+  background:var(--accent);
+  color:white;
+  padding:0 22px;
+  font-weight:700;
+  cursor:pointer
+}
+.actions{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px
+}
+.secondary{
+  min-height:46px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+  padding:0 18px;
+  font-weight:700;
+  cursor:pointer
+}
+.feedback{
+  min-height:50px;
+  margin-top:14px;
+  border-radius:14px;
+  padding:14px;
+  text-align:center;
+  font-weight:600
+}
+.feedback.good{
+  border:1px solid #b8dfc4;
+  background:var(--good-soft);
+  color:var(--good)
+}
+.feedback.info{
+  border:1px solid var(--border);
+  background:#fafbfc
+}
+@media(max-width:700px){
+  .wrap{padding:14px}
+  .levels{grid-template-columns:1fr}
+  .panel{padding:15px}
+  .answer-row{flex-direction:column}
+  .check{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Negative Numbers Practice</h1>
+
+  <div class="levels" aria-label="Choose difficulty">
+    <button class="level-btn active" data-level="foundation" type="button">Foundation</button>
+    <button class="level-btn" data-level="core" type="button">Core</button>
+    <button class="level-btn" data-level="challenge" type="button">Challenge</button>
+  </div>
+
+  <section class="panel">
+    <div class="problem">
+      <div class="problem-label">Calculate</div>
+      <div id="expression" class="expression">−8 + 5</div>
+    </div>
+
+    <div class="line-wrap">
+      <svg id="numberLine" viewBox="0 0 900 135" role="img" aria-label="Number line for the current question"></svg>
+    </div>
+
+    <form id="answerForm">
+      <label for="answerInput" class="answer-label">Your answer</label>
+      <div class="answer-row">
+        <input id="answerInput" type="number" inputmode="numeric" autocomplete="off">
+        <button id="checkBtn" class="check" type="submit">Check</button>
+      </div>
+    </form>
+
+    <div class="actions">
+      <button id="nextBtn" class="secondary" type="button">Next question</button>
+    </div>
+
+    <div id="feedback" class="feedback" aria-live="polite"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const expressionEl = document.getElementById('expression');
+  const svg = document.getElementById('numberLine');
+  const input = document.getElementById('answerInput');
+  const form = document.getElementById('answerForm');
+  const feedback = document.getElementById('feedback');
+  const nextBtn = document.getElementById('nextBtn');
+  const levelButtons = [...document.querySelectorAll('.level-btn')];
+
+  const state = {
+    level:'foundation',
+    current:null,
+    answered:false
+  };
+
+  const minus = n => n < 0 ? '−' + Math.abs(n) : String(n);
+  const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+  const choice = arr => arr[rand(0,arr.length-1)];
+
+  function foundationQuestion(){
+    for(let tries=0; tries<200; tries++){
+      const start = rand(-8,8);
+      if(start===0) continue;
+      const op = choice(['+','−']);
+      const amount = rand(2,7);
+      const answer = op==='+' ? start+amount : start-amount;
+      if(answer>=-10 && answer<=10){
+        return {start,steps:[{op,amount}],positions:[start,answer],answer};
+      }
+    }
+    return {start:-6,steps:[{op:'+',amount:4}],positions:[-6,-2],answer:-2};
+  }
+
+  function coreQuestion(){
+    const type = choice(['negCross','posCross','negativeSide','positiveSide']);
+
+    if(type==='negCross'){
+      const start=-rand(3,9);
+      const amount=rand(Math.abs(start)+2,Math.abs(start)+7);
+      const answer=start+amount;
+      return {start,steps:[{op:'+',amount}],positions:[start,answer],answer};
+    }
+
+    if(type==='posCross'){
+      const start=rand(3,9);
+      const amount=rand(start+2,start+7);
+      const answer=start-amount;
+      return {start,steps:[{op:'−',amount}],positions:[start,answer],answer};
+    }
+
+    if(type==='negativeSide'){
+      const start=-rand(4,10);
+      const op=choice(['+','−']);
+      let amount, answer;
+      if(op==='+'){
+        amount=rand(2,Math.max(2,Math.abs(start)-1));
+        answer=start+amount;
+      } else {
+        amount=rand(3,7);
+        answer=start-amount;
+      }
+      return {start,steps:[{op,amount}],positions:[start,answer],answer};
+    }
+
+    const start=rand(4,10);
+    const op=choice(['+','−']);
+    let amount, answer;
+    if(op==='−'){
+      amount=rand(2,Math.max(2,start-1));
+      answer=start-amount;
+    } else {
+      amount=rand(3,7);
+      answer=start+amount;
+    }
+    return {start,steps:[{op,amount}],positions:[start,answer],answer};
+  }
+
+  function challengeQuestion(){
+    for(let tries=0; tries<300; tries++){
+      const start=rand(-10,10);
+      if(start===0) continue;
+
+      const op1=choice(['+','−']);
+      const op2=choice(['+','−']);
+      const a=rand(3,10);
+      const b=rand(3,10);
+
+      const p1=op1==='+' ? start+a : start-a;
+      const p2=op2==='+' ? p1+b : p1-b;
+
+      if(Math.abs(p1)<=15 && Math.abs(p2)<=15){
+        return {
+          start,
+          steps:[{op:op1,amount:a},{op:op2,amount:b}],
+          positions:[start,p1,p2],
+          answer:p2
+        };
+      }
+    }
+
+    return {
+      start:-6,
+      steps:[{op:'+',amount:10},{op:'−',amount:7}],
+      positions:[-6,4,-3],
+      answer:-3
+    };
+  }
+
+  function expressionText(q){
+    let text=minus(q.start);
+    q.steps.forEach(step=>{
+      text += ` ${step.op} ${step.amount}`;
+    });
+    return text;
+  }
+
+  function makeQuestion(){
+    state.current =
+      state.level==='foundation' ? foundationQuestion() :
+      state.level==='core' ? coreQuestion() :
+      challengeQuestion();
+
+    state.answered=false;
+    input.value='';
+    input.disabled=false;
+    document.getElementById('checkBtn').disabled=false;
+    feedback.textContent='';
+    feedback.className='feedback';
+
+    expressionEl.textContent=expressionText(state.current);
+    drawNumberLine(state.current);
+    input.focus();
+  }
+
+  function drawNumberLine(q){
+    const allValues=[0,...q.positions];
+    let min=Math.min(...allValues)-2;
+    let max=Math.max(...allValues)+2;
+
+    min=Math.floor(min);
+    max=Math.ceil(max);
+
+    if(max-min<10){
+      const extra=Math.ceil((10-(max-min))/2);
+      min-=extra;
+      max+=extra;
+    }
+
+    const left=45;
+    const right=855;
+    const y=70;
+    const x=v=>left+(v-min)/(max-min)*(right-left);
+
+    const span=max-min;
+    const labelEvery = span<=20 ? 1 : span<=30 ? 2 : 5;
+
+    let html='';
+    html += `<line x1="${left}" y1="${y}" x2="${right}" y2="${y}" stroke="#172033" stroke-width="3"/>`;
+    html += `<path d="M${left+8},${y-6} L${left},${y} L${left+8},${y+6}" fill="none" stroke="#172033" stroke-width="3"/>`;
+    html += `<path d="M${right-8},${y-6} L${right},${y} L${right-8},${y+6}" fill="none" stroke="#172033" stroke-width="3"/>`;
+
+    for(let v=min; v<=max; v++){
+      const xv=x(v);
+      const major=(v===0 || v%labelEvery===0);
+      html += `<line x1="${xv}" y1="${major?y-10:y-6}" x2="${xv}" y2="${major?y+10:y+6}" stroke="#172033" stroke-width="${v===0?3:1.5}"/>`;
+      if(major){
+        html += `<text x="${xv}" y="${y+31}" text-anchor="middle" font-size="17" fill="#172033">${minus(v)}</text>`;
+      }
+    }
+
+    svg.innerHTML=html;
+    svg.setAttribute('aria-label',`Number line from ${min} to ${max}`);
+  }
+
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    if(state.answered) return;
+
+    if(input.value.trim()===''){
+      feedback.textContent='Enter an answer first.';
+      feedback.className='feedback info';
+      return;
+    }
+
+    const value=Number(input.value);
+
+    if(!Number.isFinite(value)){
+      feedback.textContent='Enter a whole number.';
+      feedback.className='feedback info';
+      return;
+    }
+
+    if(value===state.current.answer){
+      state.answered=true;
+      feedback.textContent='✓ Correct!';
+      feedback.className='feedback good';
+      input.disabled=true;
+      document.getElementById('checkBtn').disabled=true;
+    } else {
+      feedback.textContent='Not quite. Try again.';
+      feedback.className='feedback info';
+      input.select();
+    }
+  });
+
+  nextBtn.addEventListener('click',makeQuestion);
+
+  levelButtons.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      state.level=btn.dataset.level;
+      levelButtons.forEach(b=>b.classList.toggle('active',b===btn));
+      makeQuestion();
+    });
+  });
+
+  makeQuestion();
+})();
+</script>
+</body>
+</html>
